@@ -1739,7 +1739,7 @@ static bool fbcon_scroll(struct vc_data *vc, unsigned int t, unsigned int b,
 
 	if (fbcon_is_inactive(vc, info))
 		return true;
-
+	mdelay(1000);
 	fbcon_cursor(vc, false);
 
 	/*

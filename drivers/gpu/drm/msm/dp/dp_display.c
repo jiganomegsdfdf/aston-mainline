@@ -1226,7 +1226,7 @@ static int dp_display_probe_tail(struct device *dev)
 	 */
 	dp->next_bridge = devm_drm_of_get_bridge(&dp->pdev->dev, dp->pdev->dev.of_node, 1, 0);
 	if (IS_ERR(dp->next_bridge)) {
-		ret = PTR_ERR(dp->next_bridge);
+		ret = -ENODEV;
 		dp->next_bridge = NULL;
 		if (dp->is_edp || ret != -ENODEV)
 			return ret;

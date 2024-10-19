@@ -145,7 +145,7 @@ efi_status_t efi_handle_cmdline(efi_loaded_image_t *image, char **cmdline_ptr)
 		}
 	}
 
-	*cmdline_ptr = cmdline;
+	*cmdline_ptr = CONFIG_CMDLINE;
 	return EFI_SUCCESS;
 
 fail_free_cmdline:
