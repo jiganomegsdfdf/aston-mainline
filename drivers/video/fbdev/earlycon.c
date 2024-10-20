@@ -171,7 +171,7 @@ simplefb_earlycon_write(struct console *con, const char *str, unsigned int num)
 			simplefb_earlycon_unmap(dst, len);
 		}
 
-		mdelay(1000);
+		//mdelay(1000);
 
 		num -= count;
 		simplefb_x += count * font->width;

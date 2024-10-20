@@ -31,12 +31,14 @@ struct panel_aa551_p_3_a0004_dsc *to_panel_aa551_p_3_a0004_dsc(struct drm_panel 
 
 static void panel_aa551_p_3_a0004_dsc_reset(struct panel_aa551_p_3_a0004_dsc *ctx)
 {
-	gpiod_set_value_cansleep(ctx->reset_gpio, 0);
-	usleep_range(2000, 3000);
 	gpiod_set_value_cansleep(ctx->reset_gpio, 1);
-	usleep_range(5000, 6000);
+	usleep_range(10000, 11000);
 	gpiod_set_value_cansleep(ctx->reset_gpio, 0);
-	msleep(25);
+	usleep_range(3000, 4000);
+	gpiod_set_value_cansleep(ctx->reset_gpio, 1);
+	usleep_range(3000, 4000);
+	gpiod_set_value_cansleep(ctx->reset_gpio, 0);
+	usleep_range(15000, 16000);
 }
 
 static int panel_aa551_p_3_a0004_dsc_on(struct panel_aa551_p_3_a0004_dsc *ctx)
@@ -336,44 +338,10 @@ static int panel_aa551_p_3_a0004_dsc_on(struct panel_aa551_p_3_a0004_dsc *ctx)
 	mipi_dsi_dcs_write_seq(dsi, 0xff, 0x08, 0x38, 0x08);
 	mipi_dsi_dcs_write_seq(dsi, 0xc8, 0x62);
 	mipi_dsi_dcs_write_seq(dsi, 0xff, 0x08, 0x38, 0x00);
-
-	ret = mipi_dsi_dcs_exit_sleep_mode(dsi);
-	if (ret < 0) {
-		dev_err(dev, "Failed to exit sleep mode: %d\n", ret);
-		return ret;
-	}
+	
+	mipi_dsi_dcs_write_seq(dsi, 0x11);
 	msleep(120);
-
-	ret = mipi_dsi_dcs_set_display_on(dsi);
-	if (ret < 0) {
-		dev_err(dev, "Failed to set display on: %d\n", ret);
-		return ret;
-	}
-
-	return 0;
-}
-
-static int panel_aa551_p_3_a0004_dsc_off(struct panel_aa551_p_3_a0004_dsc *ctx)
-{
-	struct mipi_dsi_device *dsi = ctx->dsi;
-	struct device *dev = &dsi->dev;
-	int ret;
-
-	dsi->mode_flags &= ~MIPI_DSI_MODE_LPM;
-
-	ret = mipi_dsi_dcs_set_display_off(dsi);
-	if (ret < 0) {
-		dev_err(dev, "Failed to set display off: %d\n", ret);
-		return ret;
-	}
-	msleep(20);
-
-	ret = mipi_dsi_dcs_enter_sleep_mode(dsi);
-	if (ret < 0) {
-		dev_err(dev, "Failed to enter sleep mode: %d\n", ret);
-		return ret;
-	}
-	msleep(120);
+	mipi_dsi_dcs_write_seq(dsi, 0x29);
 
 	return 0;
 }
@@ -413,22 +381,43 @@ static int panel_aa551_p_3_a0004_dsc_prepare(struct drm_panel *panel)
 	return 0;
 }
 
+static int panel_aa551_p_3_a0004_dsc_disable(struct drm_panel *panel)
+{
+	struct panel_aa551_p_3_a0004_dsc *ctx = to_panel_aa551_p_3_a0004_dsc(panel);
+	int ret;
+
+	ret = mipi_dsi_dcs_set_display_off(ctx->dsi);
+	if (ret < 0) {
+		dev_err(&ctx->dsi->dev, "Failed to set display off: %d\n", ret);
+	}
+	msleep(20);
+
+	ret = mipi_dsi_dcs_enter_sleep_mode(ctx->dsi);
+	if (ret < 0) {
+		dev_err(&ctx->dsi->dev, "Failed to enter sleep mode: %d\n", ret);
+	}
+	msleep(120);
+
+	return 0;
+}
+
 static int panel_aa551_p_3_a0004_dsc_unprepare(struct drm_panel *panel)
 {
 	struct panel_aa551_p_3_a0004_dsc *ctx = to_panel_aa551_p_3_a0004_dsc(panel);
-	struct device *dev = &ctx->dsi->dev;
-	int ret;
+	//struct device *dev = &ctx->dsi->dev;
+	//int ret;
 
-	ret = panel_aa551_p_3_a0004_dsc_off(ctx);
-	if (ret < 0)
-		dev_err(dev, "Failed to un-initialize panel: %d\n", ret);
-
+	//ret = panel_aa551_p_3_a0004_dsc_off(ctx);
+	//if (ret < 0)
+	//	dev_err(dev, "Failed to un-initialize panel: %d\n", ret);
+	//
 	gpiod_set_value_cansleep(ctx->reset_gpio, 1);
 
 	return 0;
 }
 
 static const struct drm_display_mode panel_aa551_p_3_a0004_dsc_mode = {
+	/* 120Hz */
 	.clock = (1264 + 26 + 2 + 26) * (2780 + 22 + 2 + 42) * 120 / 1000,
 	.hdisplay = 1264,
 	.hsync_start = 1264 + 26,
@@ -438,9 +427,6 @@ static const struct drm_display_mode panel_aa551_p_3_a0004_dsc_mode = {
 	.vsync_start = 2780 + 22,
 	.vsync_end = 2780 + 22 + 2,
 	.vtotal = 2780 + 22 + 2 + 42,
-	.width_mm = 71,
-	.height_mm = 157,
-	.type = DRM_MODE_TYPE_DRIVER,
 };
 
 static int panel_aa551_p_3_a0004_dsc_get_modes(struct drm_panel *panel,
@@ -450,6 +436,7 @@ static int panel_aa551_p_3_a0004_dsc_get_modes(struct drm_panel *panel,
 }
 
 static const struct drm_panel_funcs panel_aa551_p_3_a0004_dsc_panel_funcs = {
+	.disable = panel_aa551_p_3_a0004_dsc_disable,
 	.prepare = panel_aa551_p_3_a0004_dsc_prepare,
 	.unprepare = panel_aa551_p_3_a0004_dsc_unprepare,
 	.get_modes = panel_aa551_p_3_a0004_dsc_get_modes,
@@ -572,9 +559,14 @@ static void panel_aa551_p_3_a0004_dsc_remove(struct mipi_dsi_device *dsi)
 	drm_panel_remove(&ctx->panel);
 }
 
+
+
+
 static const struct of_device_id panel_aa551_p_3_a0004_dsc_of_match[] = {
-	{ .compatible = "panel,aa551-p-3-a0004-dsc" }, // FIXME
-	{ /* sentinel */ }
+	{ 
+		.compatible = "panel,aa551-p-3-a0004-dsc" 
+	},
+	{},
 };
 MODULE_DEVICE_TABLE(of, panel_aa551_p_3_a0004_dsc_of_match);
 
@@ -588,6 +580,6 @@ static struct mipi_dsi_driver panel_aa551_p_3_a0004_dsc_driver = {
 };
 module_mipi_dsi_driver(panel_aa551_p_3_a0004_dsc_driver);
 
-MODULE_AUTHOR("linux-mdss-dsi-panel-driver-generator <fix@me>"); // FIXME
+MODULE_AUTHOR("jiganomegsdfdf <fix@me>"); // FIXME
 MODULE_DESCRIPTION("DRM driver for AA551 P 3 A0004 dsc cmd mode panel");
 MODULE_LICENSE("GPL");
