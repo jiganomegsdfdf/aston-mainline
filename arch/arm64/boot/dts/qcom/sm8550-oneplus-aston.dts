@@ -49,16 +49,6 @@
 		#address-cells = <2>;
 		#size-cells = <2>;
 		ranges;
-
-		framebuffer@b8000000 {
-			compatible = "simple-framebuffer";
-			reg = <0x0 0xb8000000 0x0 (1264 * 2780 * 4)>;
-			width = <1264>;
-			height = <2780>;
-			stride = <(1264 * 4)>;
-			format = "a8r8g8b8";
-			clocks = <&gcc GCC_DISP_AHB_CLK>, <&gcc GCC_DISP_HF_AXI_CLK>;
-		};
 	};
 
 	gpio-keys {
@@ -78,7 +68,7 @@
 	};
 
 	pmic-glink {
-		compatible = "xiaomi,sm8550-pmic-glink", "qcom,sm8550-pmic-glink", "qcom,pmic-glink";
+		compatible = "qcom,sm8550-pmic-glink", "qcom,pmic-glink";
 		#address-cells = <1>;
 		#size-cells = <0>;
 		orientation-gpios = <&tlmm 11 GPIO_ACTIVE_HIGH>;
@@ -349,11 +339,6 @@
 		device_info_mem: device_info_mem@a4f00000 { //done?
 			reg = <0x00 0xa4f00000 0x00 0x8000>;
 		};
-		
-		splash_region: splash_region@b8000000 { //done?
-			reg = <0x0 0xb8000000 0x0 0x2b00000>;
-			no-map;
-		};
 	};
 
 	vph_pwr: vph-pwr-regulator {
@@ -364,6 +349,68 @@
 
 		regulator-always-on;
 		regulator-boot-on;
+	};
+	
+	wcn7850-pmu {
+		compatible = "qcom,wcn7850-pmu";
+
+		pinctrl-names = "default";
+		pinctrl-0 = <&wlan_en>, <&pmk8550_sleep_clk>;
+
+		wlan-enable-gpios = <&tlmm 80 GPIO_ACTIVE_HIGH>;
+		/*
+		 * TODO Add bt-enable-gpios once the Bluetooth driver is
+		 * converted to using the power sequencer.
+		 */
+
+		vdd-supply = <&vreg_s5g_0p8>; // There
+		vddio-supply = <&vreg_l15b_1p8>; // There
+		vddaon-supply = <&vreg_s2g_0p8>; // There
+		vdddig-supply = <&vreg_s4e_0p9>; // There
+		vddrfa1p2-supply = <&vreg_s4g_1p3>; // There RFA2
+		vddrfa1p8-supply = <&vreg_s6g_1p8>; // There RFA1
+
+		regulators {
+			vreg_pmu_rfa_cmn: ldo0 {
+				regulator-name = "vreg_pmu_rfa_cmn";
+			};
+
+			vreg_pmu_aon_0p59: ldo1 {
+				regulator-name = "vreg_pmu_aon_0p59";
+			};
+
+			vreg_pmu_wlcx_0p8: ldo2 {
+				regulator-name = "vreg_pmu_wlcx_0p8";
+			};
+
+			vreg_pmu_wlmx_0p85: ldo3 {
+				regulator-name = "vreg_pmu_wlmx_0p85";
+			};
+
+			vreg_pmu_btcmx_0p85: ldo4 {
+				regulator-name = "vreg_pmu_btcmx_0p85";
+			};
+
+			vreg_pmu_rfa_0p8: ldo5 {
+				regulator-name = "vreg_pmu_rfa_0p8";
+			};
+
+			vreg_pmu_rfa_1p2: ldo6 {
+				regulator-name = "vreg_pmu_rfa_1p2";
+			};
+
+			vreg_pmu_rfa_1p8: ldo7 {
+				regulator-name = "vreg_pmu_rfa_1p8";
+			};
+
+			vreg_pmu_pcie_0p9: ldo8 {
+				regulator-name = "vreg_pmu_pcie_0p9";
+			};
+
+			vreg_pmu_pcie_1p8: ldo9 {
+				regulator-name = "vreg_pmu_pcie_1p8";
+			};
+		};
 	};
 };
 
@@ -772,7 +819,7 @@
 
 &ipa {
 	qcom,gsi-loader = "self";
-	memory-region = <&ipa_fw_mem>;
+	memory-region = <&ipa_gsi_mem>;
 	firmware-name = "qcom/sm8550/aston/ipa_fws.mbn";
 	status = "okay";
 };
@@ -833,6 +880,17 @@
 
 &qupv3_id_1 {
 	status = "okay";
+};
+
+&pmk8550_rtc {
+	nvmem-cells = <&rtc_offset>;
+	nvmem-cell-names = "offset";
+};
+
+&pmk8550_sdam_2 {
+	rtc_offset: rtc-offset@bc {
+		reg = <0xbc 0x4>;
+	};
 };
 
 &remoteproc_adsp {
@@ -991,17 +1049,13 @@
 	clock-frequency = <76800000>;
 };
 
-&dispcc {
-	status = "disabled";
-};
-
 &mdss {
-	status = "disabled";
+	status = "okay";
 };
 
 &mdss_dsi0 {
 	vdda-supply = <&vreg_l3e_1p2>;
-	status = "disabled";
+	status = "okay";
 	
 	panel@0 {
 		compatible = "panel,aa551-p-3-a0004-dsc";
@@ -1025,12 +1079,76 @@
 };
 
 &mdss_dsi0_out {
-	status = "disabled";
+	status = "okay";
 	data-lanes = <0 1 2 3>;
 	remote-endpoint = <&panel_in>;
 };
 
 &mdss_dsi0_phy {
 	vdds-supply = <&vreg_l1e_0p88>;
-	status = "disabled";
+	status = "okay";
 };
+
+&pcie0 {
+	wake-gpios = <&tlmm 96 GPIO_ACTIVE_HIGH>;
+	perst-gpios = <&tlmm 94 GPIO_ACTIVE_LOW>;
+
+	pinctrl-names = "default";
+	pinctrl-0 = <&pcie0_default_state>;
+
+	status = "okay";
+};
+
+&pcieport0 {
+	status = "okay";
+	
+	wifi@0 {
+		compatible = "pci17cb,1107";
+		reg = <0x10000 0x0 0x0 0x0 0x0>;
+
+		vddrfacmn-supply = <&vreg_pmu_rfa_cmn>;
+		vddaon-supply = <&vreg_pmu_aon_0p59>;
+		vddwlcx-supply = <&vreg_pmu_wlcx_0p8>;
+		vddwlmx-supply = <&vreg_pmu_wlmx_0p85>;
+		vddrfa0p8-supply = <&vreg_pmu_rfa_0p8>;
+		vddrfa1p2-supply = <&vreg_pmu_rfa_1p2>;
+		vddrfa1p8-supply = <&vreg_pmu_rfa_1p8>;
+		vddpcie0p9-supply = <&vreg_pmu_pcie_0p9>;
+		vddpcie1p8-supply = <&vreg_pmu_pcie_1p8>;
+		status = "okay";
+	};
+};
+
+&pcie0_phy {
+	vdda-phy-supply = <&vreg_l1e_0p88>;
+	vdda-pll-supply = <&vreg_l3e_1p2>;
+
+	status = "okay";
+};
+
+&uart14 {
+	status = "okay";
+
+	bluetooth {
+		compatible = "qcom,wcn7850-bt";
+
+		local-bd-address = [ c2 59 96 e0 ca 00 ];
+
+		vddio-supply = <&vreg_l15b_1p8>; // There
+		vddaon-supply = <&vreg_s4e_0p9>; // There
+		vdddig-supply = <&vreg_s4e_0p9>; // There
+		vddrfa0p8-supply = <&vreg_s4e_0p9>; // There
+		vddrfa1p2-supply = <&vreg_s4g_1p3>; // There RFA2
+		vddrfa1p9-supply = <&vreg_s6g_1p8>; // There RFA1
+
+		max-speed = <3200000>;
+
+		enable-gpios = <&tlmm 81 GPIO_ACTIVE_HIGH>;
+		swctrl-gpios = <&tlmm 82 GPIO_ACTIVE_HIGH>;
+
+		pinctrl-0 = <&bt_default>;
+		pinctrl-names = "default";
+	};
+};
+
+//#include "sm8550-oneplus-aston-simplefb.dts"

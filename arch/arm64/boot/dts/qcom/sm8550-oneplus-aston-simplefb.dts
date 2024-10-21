@@ -1,0 +1,40 @@
+/ {
+	chosen {
+		framebuffer@b8000000 {
+			compatible = "simple-framebuffer";
+			reg = <0x0 0xb8000000 0x0 (1264 * 2780 * 4)>;
+			width = <1264>;
+			height = <2780>;
+			stride = <(1264 * 4)>;
+			format = "a8r8g8b8";
+			clocks = <&gcc GCC_DISP_AHB_CLK>, <&gcc GCC_DISP_HF_AXI_CLK>;
+		};
+	};
+
+	reserved-memory {	
+		splash_region: splash_region@b8000000 { 
+			reg = <0x0 0xb8000000 0x0 0x2b00000>;
+			no-map;
+		};
+	};
+};
+
+&dispcc {
+	status = "disabled";
+};
+
+&mdss {
+	status = "disabled";
+};
+
+&mdss_dsi0 {
+	status = "disabled";
+};
+
+&mdss_dsi0_out {
+	status = "disabled";
+};
+
+&mdss_dsi0_phy {
+	status = "disabled";
+};
