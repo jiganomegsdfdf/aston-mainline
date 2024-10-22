@@ -73,9 +73,9 @@ static int panel_aa551_p_3_a0004_dsc_on(struct panel_aa551_p_3_a0004_dsc *ctx)
 	mipi_dsi_dcs_write_seq(dsi, 0xff, 0x08, 0x38, 0x31);
 	mipi_dsi_dcs_write_seq(dsi, 0xa0, 0xf3);
 	//DSC 1.2 CONFIG
-	mipi_dsi_dcs_write_seq(dsi, 0xff, 0x08, 0x38, 0x07);
-	mipi_dsi_dcs_write_seq(dsi, 0x8a, 0x01);
-	mipi_dsi_dcs_write_seq(dsi, 0x8b, 0x11, 0xe0);
+	//mipi_dsi_dcs_write_seq(dsi, 0xff, 0x08, 0x38, 0x07);
+	//mipi_dsi_dcs_write_seq(dsi, 0x8a, 0x00);
+	//mipi_dsi_dcs_write_seq(dsi, 0x8b, 0x11, 0xe0);
 	//CHANGE PPS TABLE
 	mipi_dsi_dcs_write_seq(dsi, 0x81,
 			       0x00, 0x00, 0x00, 0x00, 0x00, 0x12, 0x00, 0x00,
@@ -315,6 +315,7 @@ static int panel_aa551_p_3_a0004_dsc_on(struct panel_aa551_p_3_a0004_dsc *ctx)
 				   0x70, 0x00, 0x10, 0x20, 0x20, 0x20, 0x20, 0x20, 
 				   0x20, 0x70, 0x00);
 	mipi_dsi_dcs_write_seq(dsi, 0xff, 0x08, 0x38, 0x00);
+	
 	mipi_dsi_dcs_set_display_on(dsi);
 
 	return 0;
@@ -498,12 +499,12 @@ static int panel_aa551_p_3_a0004_dsc_probe(struct mipi_dsi_device *dsi)
 
 	ctx->dsc.slice_height = 20; //works 20
 	ctx->dsc.slice_width = 632; //works 632
-	ctx->dsi->dsc_slice_per_pkt = 2; //works 1
+	ctx->dsi->dsc_slice_per_pkt = 1; //works 1
 	ctx->dsc.slice_count = 2; //works 2
-	ctx->dsc.convert_rgb = false; //works true
+	ctx->dsc.convert_rgb = true; //works true
 	ctx->dsc.bits_per_component = 10; //works 10
 	ctx->dsc.bits_per_pixel = 8 << 4; /* 4 fractional bits */
-	ctx->dsc.block_pred_enable = true;
+	//ctx->dsc.block_pred_enable = true;
 
 	ret = mipi_dsi_attach(dsi);
 	if (ret < 0) {
