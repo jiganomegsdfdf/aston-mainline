@@ -21,6 +21,9 @@ struct panel_aa551_p_3_a0004_dsc {
 	struct mipi_dsi_device *dsi;
 	struct drm_dsc_config dsc;
 	struct gpio_desc *reset_gpio;
+	
+	struct regulator *vddio;
+	struct regulator *vci;
 };
 
 static inline
@@ -293,6 +296,47 @@ static int panel_aa551_p_3_a0004_dsc_on(struct panel_aa551_p_3_a0004_dsc *ctx)
 	mipi_dsi_dcs_write_seq(dsi, 0xff, 0x08, 0x38, 0x08);
 	mipi_dsi_dcs_write_seq(dsi, 0xc8, 0x62);
 	mipi_dsi_dcs_write_seq(dsi, 0xff, 0x08, 0x38, 0x00);
+
+	return 0;
+}
+
+static int panel_aa551_p_3_a0004_dsc_off(struct panel_aa551_p_3_a0004_dsc *ctx)
+{
+	struct mipi_dsi_device *dsi = ctx->dsi;
+	struct device *dev = &dsi->dev;
+	int ret;
+	
+	//mdss-dsi-loading-effect-off-command
+	mipi_dsi_dcs_write_seq(dsi, 0xff, 0x08, 0x38, 0x63);
+	mipi_dsi_dcs_write_seq(dsi, 0x95, 0xfc, 0xfc, 0xeb, 0xda, 0xc9, 0xb9, 0xa8, 0x97, 0x86, 0x75, 0x64, 0x54, 0x43, 0x32, 0x21, 0x10);
+	mipi_dsi_dcs_write_seq(dsi, 0x96, 0xff, 0x88, 0x90, 0x98, 0xa0, 0xff, 0xa8, 0xb0, 0xb8, 0xc0, 0xff, 0xc7, 0xcf, 0xd7, 0xdf, 0xff, 0xe7, 0xef, 0xf7, 0xff);
+	mipi_dsi_dcs_write_seq(dsi, 0x97, 0xff, 0xee, 0xdd, 0xcc, 0xbb, 0xaa, 0x99, 0x88, 0x77, 0x66, 0x55, 0x44, 0x33, 0x22, 0x11, 0x00);
+	mipi_dsi_dcs_write_seq(dsi, 0x90, 0x01);
+	mipi_dsi_dcs_write_seq(dsi, 0xff, 0x08, 0x38, 0x00);
+	
+	msleep(120);
+
+	ret = mipi_dsi_dcs_set_display_off(dsi);
+	if (ret < 0) {
+		dev_err(dev, "Failed to set display off: %d\n", ret);
+		return ret;
+	}
+	msleep(20);
+
+	ret = mipi_dsi_dcs_enter_sleep_mode(dsi);
+	if (ret < 0) {
+		dev_err(dev, "Failed to enter sleep mode: %d\n", ret);
+		return ret;
+	}
+	msleep(120);
+
+	return 0;
+}
+
+static int panel_aa551_p_3_a0004_dsc_turn_on(struct panel_aa551_p_3_a0004_dsc *ctx)
+{
+	struct mipi_dsi_device *dsi = ctx->dsi;
+	
 	mipi_dsi_dcs_exit_sleep_mode(dsi);
 	
 	msleep(120); // Required
@@ -321,40 +365,31 @@ static int panel_aa551_p_3_a0004_dsc_on(struct panel_aa551_p_3_a0004_dsc *ctx)
 	return 0;
 }
 
-static int panel_aa551_p_3_a0004_dsc_off(struct panel_aa551_p_3_a0004_dsc *ctx)
-{
-	struct mipi_dsi_device *dsi = ctx->dsi;
-	struct device *dev = &dsi->dev;
-	int ret;
-
-	ret = mipi_dsi_dcs_set_display_off(dsi);
-	if (ret < 0) {
-		dev_err(dev, "Failed to set display off: %d\n", ret);
-		return ret;
-	}
-	msleep(20);
-
-	ret = mipi_dsi_dcs_enter_sleep_mode(dsi);
-	if (ret < 0) {
-		dev_err(dev, "Failed to enter sleep mode: %d\n", ret);
-		return ret;
-	}
-	msleep(120);
-
-	return 0;
-}
-
 static int panel_aa551_p_3_a0004_dsc_prepare(struct drm_panel *panel)
 {
 	struct panel_aa551_p_3_a0004_dsc *ctx = to_panel_aa551_p_3_a0004_dsc(panel);
 	struct device *dev = &ctx->dsi->dev;
 	struct drm_dsc_picture_parameter_set pps;
 	int ret;
+	
+	ret = regulator_enable(ctx->vddio);
+	if (ret) {
+		dev_err(dev, "failed to enable vddio regulator: %d\n", ret);
+		return ret;
+	}
+	
+	ret = regulator_enable(ctx->vci);
+	if (ret) {
+		dev_err(dev, "failed to enable vci regulator: %d\n", ret);
+		return ret;
+	}
 
 	panel_aa551_p_3_a0004_dsc_reset(ctx);
 
 	ret = panel_aa551_p_3_a0004_dsc_on(ctx);
 	if (ret < 0) {
+		regulator_disable(ctx->vci);
+		regulator_disable(ctx->vddio);
 		dev_err(dev, "Failed to initialize panel: %d\n", ret);
 		gpiod_set_value_cansleep(ctx->reset_gpio, 1);
 		return ret;
@@ -379,6 +414,32 @@ static int panel_aa551_p_3_a0004_dsc_prepare(struct drm_panel *panel)
 	return 0;
 }
 
+static int panel_aa551_p_3_a0004_dsc_enable(struct drm_panel *panel)
+{
+	struct panel_aa551_p_3_a0004_dsc *ctx = to_panel_aa551_p_3_a0004_dsc(panel);
+	struct device *dev = &ctx->dsi->dev;
+	int ret;
+
+	ret = panel_aa551_p_3_a0004_dsc_turn_on(ctx);
+	if (ret < 0)
+		dev_err(dev, "Failed to enable panel: %d\n", ret);
+
+	return 0;
+}
+
+static int panel_aa551_p_3_a0004_dsc_disable(struct drm_panel *panel)
+{
+	struct panel_aa551_p_3_a0004_dsc *ctx = to_panel_aa551_p_3_a0004_dsc(panel);
+	struct device *dev = &ctx->dsi->dev;
+	int ret;
+
+	ret = panel_aa551_p_3_a0004_dsc_off(ctx);
+	if (ret < 0)
+		dev_err(dev, "Failed to un-initialize panel: %d\n", ret);
+
+	return 0;
+}
+
 static int panel_aa551_p_3_a0004_dsc_unprepare(struct drm_panel *panel)
 {
 	struct panel_aa551_p_3_a0004_dsc *ctx = to_panel_aa551_p_3_a0004_dsc(panel);
@@ -390,6 +451,8 @@ static int panel_aa551_p_3_a0004_dsc_unprepare(struct drm_panel *panel)
 		dev_err(dev, "Failed to un-initialize panel: %d\n", ret);
 
 	gpiod_set_value_cansleep(ctx->reset_gpio, 1);
+	regulator_disable(ctx->vci);
+	regulator_disable(ctx->vddio);
 
 	return 0;
 }
@@ -415,6 +478,8 @@ static int panel_aa551_p_3_a0004_dsc_get_modes(struct drm_panel *panel,
 static const struct drm_panel_funcs panel_aa551_p_3_a0004_dsc_panel_funcs = {
 	.prepare = panel_aa551_p_3_a0004_dsc_prepare,
 	.unprepare = panel_aa551_p_3_a0004_dsc_unprepare,
+	.enable = panel_aa551_p_3_a0004_dsc_enable,
+	.disable = panel_aa551_p_3_a0004_dsc_disable,
 	.get_modes = panel_aa551_p_3_a0004_dsc_get_modes,
 };
 
@@ -458,6 +523,14 @@ static int panel_aa551_p_3_a0004_dsc_probe(struct mipi_dsi_device *dsi)
 	ctx = devm_kzalloc(dev, sizeof(*ctx), GFP_KERNEL);
 	if (!ctx)
 		return -ENOMEM;
+	
+	ctx->vddio = devm_regulator_get(dev, "vddio");
+	if (IS_ERR(ctx->vddio))
+		return dev_err_probe(dev, PTR_ERR(ctx->vddio), "failed to get vddio regulator\n");
+	
+	ctx->vci = devm_regulator_get(dev, "vci");
+	if (IS_ERR(ctx->vci))
+		return dev_err_probe(dev, PTR_ERR(ctx->vddio), "failed to get vci regulator\n");
 
 	ctx->reset_gpio = devm_gpiod_get(dev, "reset", GPIOD_OUT_HIGH);
 	if (IS_ERR(ctx->reset_gpio))
