@@ -66,6 +66,11 @@
 			wakeup-source;
 		};
 	};
+	
+	bat: battery {
+		compatible = "simple-battery";
+		voltage-min-design-microvolt = <6700000>;
+	};
 
 	pmic-glink {
 		compatible = "qcom,sm8550-pmic-glink", "qcom,pmic-glink";
@@ -523,7 +528,6 @@
 			regulator-min-microvolt = <1800000>;
 			regulator-max-microvolt = <1800000>;
 			regulator-initial-mode = <RPMH_REGULATOR_MODE_HPM>;
-			regulator-always-on;
 		};
 
 		vreg_l13b_3p3: ldo13 {
@@ -531,7 +535,6 @@
 			regulator-min-microvolt = <3000000>;
 			regulator-max-microvolt = <3200000>;
 			regulator-initial-mode = <RPMH_REGULATOR_MODE_HPM>;
-			regulator-always-on;
 		};
 
 		vreg_l14b_3p2: ldo14 {
@@ -908,7 +911,7 @@
 &remoteproc_mpss {
 	firmware-name = "qcom/sm8550/aston/modem.mbn",
 			"qcom/sm8550/aston/modem_dtb.mbn";
-	status = "okay";
+	status = "disabled";
 };
 
 &sleep_clk {
@@ -959,6 +962,22 @@
 			bias-pull-down;
 		};
 	};
+	
+	ts_reset_active: ts_reset_active-state {
+		pins = "gpio24";
+		function = "gpio";
+		bias-disable;
+		output-low;
+		drive-strength = <8>;
+	};
+
+	ts_int_active: ts_int_active-state {
+		pins = "gpio25";
+		function = "gpio";
+		bias-pull-up;
+		drive-strength = <8>;
+		input-enable;
+	};
 
 	wlan_en: wlan-en-state {
 		pins = "gpio80";
@@ -983,21 +1002,21 @@
 		};
 	};
 
-	bq27541_id_not_pull: bq27541_id_not_pull {
+	bq27541_id_not_pull: bq27541_id_not_pull-state {
 		pins = "gpio73";
 		function = "gpio";
 		drive-strength = <2>;
 		bias-disable;
 	};
 	
-	bq27541_id_pull_up: bq27541_id_pull_up {
+	bq27541_id_pull_up: bq27541_id_pull_up-state {
 		pins = "gpio73";
 		function = "gpio";
 		drive-strength = <2>;
 		bias-pull-up;
 	};
 	
-	bq27541_id_pull_down: bq27541_id_pull_down {
+	bq27541_id_pull_down: bq27541_id_pull_down-state {
 		pins = "gpio73";
 		function = "gpio";
 		drive-strength = <2>;
@@ -1172,6 +1191,67 @@
 
 		pinctrl-0 = <&bt_default>;
 		pinctrl-names = "default";
+	};
+};
+
+&i2c8 {
+	status = "okay";
+	bq28z610: fuel-gauge@55 {
+		compatible = "ti,bq28z610";
+		reg = <0x55>;
+		pinctrl-names = "id_not_pull", "id_pull_up", "id_pull_down";
+		pinctrl-0 = <&bq27541_id_not_pull>;
+		pinctrl-1 = <&bq27541_id_pull_up>;
+		pinctrl-2 = <&bq27541_id_pull_down>;
+		monitored-battery = <&bat>;
+	};
+};
+
+&spi4 {
+	status = "okay";
+	synaptics_tcm_hbp@0 {
+		compatible = "synaptics,tcm-spi-hbp";
+		reg = <0x0>;
+		chip-name = "S3910";
+		status = "okay";
+		spi-max-frequency = <19000000>;
+		qcom,rt;
+
+		/* Interrupt && Irq-gpio */
+		interrupt-parent = <&tlmm>;
+		interrupts = <25 0x2008>;
+
+		/* Power Config */
+		synaptics,avdd-gpio = <&tlmm 10 0x1>;
+		vdd-supply = <&vreg_l4b_1p8>;
+		synaptics,vdd-name = "vdd";
+
+		/* Other HW Resource */
+		synaptics,irq-gpio = <&tlmm 25 0x2008>;
+		synaptics,reset-gpio = <&tlmm 24 0x1>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&ts_int_active &ts_reset_active>;
+
+		touchpanel,panel-coords = <20224 44480>;
+		touchpanel,tx-rx-num = <17 38>;
+		touchpanel,tp_ic_type = <2>;
+		panel_type = <3 7>;
+		// type of tp_dev ,TP-SAMSUNG = 8;
+		firmware_name = "AA551";
+		
+		synaptics,power-on-state = <1>;
+		synaptics,power-delay-ms = <200>;
+		synaptics,irq-on-state = <0>;
+		synaptics,reset-on-state = <0>;
+		synaptics,reset-active-ms = <10>;
+		synaptics,reset-delay-ms = <80>;
+		synaptics,spi-mode = <0>;
+		synaptics,spi-byte-delay-us = <0>;
+		synaptics,spi-block-delay-us = <0>;
+
+		S3910_PANEL7 {
+			touchpanel,tx-rx-num = <18 39>;
+		};
 	};
 };
 
